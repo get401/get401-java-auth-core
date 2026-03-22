@@ -7,7 +7,7 @@ build/
 ### STS ###
 .apt_generated
 .classpath
-.factorypath
+.factorypath 
 .project
 .settings
 .springBeans
@@ -34,3 +34,4 @@ out/
 
 ### VS Code ###
 .vscode/
+gradle.properties

@@ -1,15 +1,18 @@
 plugins {
 	id 'java-library'
 	id 'maven-publish'
+	id 'signing'
 }
 
 group = 'com.get401'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.1'
 
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
 	}
+	withJavadocJar()
+	withSourcesJar()
 }
 
 repositories {
@@ -30,6 +33,76 @@ publishing {
 	publications {
 		mavenJava(MavenPublication) {
 			from components.java
+			pom {
+				name = 'Get401 Auth Core'
+				description = 'Core annotations and utilities for Get401 authentication and authorization'
+				url = 'https://get401.com'
+				licenses {
+					license {
+						name = 'Apache License, Version 2.0'
+						url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+					}
+				}
+				developers {
+					developer {
+						id = 'get401'
+						name = 'Get401 Team'
+						email = 'support@get401.com'
+						organization = 'Get401'
+						organizationUrl = 'https://get401.com'
+					}
+				}
+				scm {
+					connection = 'scm:git:git://github.com/get401/java-auth-core.git'
+					developerConnection = 'scm:git:ssh://github.com/get401/java-auth-core.git'
+					url = 'https://github.com/get401/java-auth-core'
+				}
+
+				developers {
+                    developer {
+                        id = 'get401'
+                        name = 'Ivan Ermolaev'
+                        email = 'support@get401.com'
+                        organizationUrl = 'https://get401.com'
+                    }
+                }
+			}
 		}
 	}
+	repositories {
+		maven {
+			def releaseRepo = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+			def snapshotRepo = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+			
+			name = "OSSRH"
+			url = !project.version.endsWith("SNAPSHOT") ? releaseRepo : snapshotRepo
+			
+			def ossrhUser = findProperty("ossrhUsername") ?: System.getenv("OSSRH_USERNAME")
+			def ossrhPass = findProperty("ossrhPassword") ?: System.getenv("OSSRH_PASSWORD")
+			if (ossrhUser != null && ossrhPass != null) {
+				credentials {
+					username = ossrhUser
+					password = ossrhPass
+				}
+			}
+		}
+		// Local repo for generating a bundle to upload to the modern Central Portal UI
+		maven {
+			name = "CentralPortalBundle"
+			url = layout.buildDirectory.dir("central-portal-repo")
+		}
+	}
+}
+
+signing {
+	required { (gradle.taskGraph.hasTask("publish") || gradle.taskGraph.hasTask("zipCentralPortalBundle")) && !project.version.endsWith("SNAPSHOT") }
+	useGpgCmd()
+	sign publishing.publications.mavenJava
+}
+
+tasks.register('zipCentralPortalBundle', Zip) {
+    dependsOn 'publishAllPublicationsToCentralPortalBundleRepository'
+    from(layout.buildDirectory.dir("central-portal-repo"))
+    archiveFileName = "${project.name}-${project.version}-central-portal.zip"
+    destinationDirectory = layout.buildDirectory.dir("distributions")
 }
