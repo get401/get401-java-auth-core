@@ -8,6 +8,7 @@ The **Get401 Auth Core** is a foundational Java library designed to seamlessly i
 
 - **Dynamic Key Provisioning:** Automatically fetches the required Ed25519 public key from the Get401 platform to verify JSON Web Tokens (JWTs).
 - **Core Security Annotations:** Declarative, easy-to-use annotations for enforcing authentication, role-based access control (RBAC), and scope-based authorization.
+- **Backend Management Client:** A typed HTTP client (`Get401Client`) for server-to-server user management — list, retrieve, and disable users via the Get401 backend API.
 - **Lightweight & Modern:** Built for Java 21+ using the built-in HTTP Client with HTTP/2 and modern fast Ed25519 cryptography.
 
 ## 📦 Requirements
@@ -98,7 +99,113 @@ JwtPublicKeyProvider keyProvider = new JwtPublicKeyProvider(appId, origin, get40
 PublicKey publicKey = keyProvider.getPublicKey();
 ```
 
-> **Note:** The `getPublicKey()` method caches the parsed Ed25519 key in memory after the first successful network fetch, reducing latency to virtually zero on all subsequent calls.
+> **Note:** The `getPublicKey()` method caches the parsed Ed25519 key in memory after the first successful network fetch, reducing latency to virtually zero on all subsequent calls. The key is automatically refreshed when its server-issued expiry time is reached.
+
+---
+
+### 3. `Get401Client`
+
+`Get401Client` is a typed HTTP client for server-to-server communication with the Get401 backend API. It is intended for use in trusted backend environments only — never in client-facing code. All requests are authenticated with an API key and are automatically scoped to the tenant that owns the key.
+
+> **Obtaining an API key:** Keys are created through the Get401 platform by an authenticated admin user. The key value (`sk_live_...`) is returned only at creation time — store it securely.
+
+#### Initialization
+
+```java
+import com.get401.auth.core.client.Get401Client;
+
+// Use the default base URL (https://app.get401.com)
+Get401Client client = new Get401Client("sk_live_your_api_key");
+
+// Or specify a custom base URL (e.g. for local/staging environments)
+Get401Client client = new Get401Client("sk_live_your_api_key", "https://staging.get401.com");
+```
+
+#### List Users
+
+Users are returned in cursor-paginated pages. Each response contains an opaque `next` cursor — pass it to the next call to advance through the result set. When `next` is `null`, you have reached the last page.
+
+```java
+import com.get401.auth.core.model.UsersPage;
+import com.get401.auth.core.model.User;
+
+// First page — default server page size
+UsersPage page = client.listUsers();
+
+// First page — explicit page size (1–100)
+UsersPage page = client.listUsers(50);
+
+// Subsequent pages — pass the cursor from the previous response
+while (page.getNext() != null) {
+    page = client.listUsers(page.getNext());
+    // process page.getItems() ...
+}
+```
+
+#### Get a Single User
+
+```java
+User user = client.getUserById("usr_abc123");
+
+System.out.println(user.getName());   // "Jane Doe"
+System.out.println(user.getEmail());  // "jane@example.com"
+System.out.println(user.isActive());  // true
+```
+
+#### Disable a User
+
+Disabling a user sets their `is_active` flag to `false`, preventing future logins. The user record is retained and can be re-enabled through the platform UI.
+
+```java
+client.disableUser("usr_abc123");
+```
+
+#### Error Handling
+
+All methods throw `Get401ApiException` (a `RuntimeException`) on non-2xx responses. The exception exposes the HTTP status code and the error code string from the response body, making it easy to handle specific failure cases.
+
+```java
+import com.get401.auth.core.client.Get401ApiException;
+
+try {
+    User user = client.getUserById("usr_unknown");
+} catch (Get401ApiException e) {
+    switch (e.getStatus()) {
+        case 401 -> // invalid or expired API key
+        case 404 -> // user not found or belongs to a different tenant
+        case 500 -> // unexpected server error
+    }
+    // e.getErrorCode() returns the raw string, e.g. "not_found"
+}
+```
+
+---
+
+### 4. Model Entities
+
+#### `User`
+
+Represents a single user belonging to the tenant associated with your API key.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `String` | Unique public identifier (e.g. `usr_abc123`). Use this in all API calls. |
+| `name` | `String` | Display name of the user. |
+| `email` | `String` | Email address of the user. |
+| `active` | `boolean` | `true` if the user is allowed to authenticate. `false` means the account is disabled. |
+| `createdAt` | `String` | ISO 8601 UTC timestamp of when the record was created. |
+| `updatedAt` | `String` | ISO 8601 UTC timestamp of the last modification. |
+
+> The JSON fields `is_active`, `created_at`, and `updated_at` are mapped automatically. Use the standard Java getters (`isActive()`, `getCreatedAt()`, `getUpdatedAt()`).
+
+#### `UsersPage`
+
+Wraps a single page of results from the list-users endpoint.
+
+| Field | Type | Description |
+|---|---|---|
+| `items` | `List<User>` | The users on this page. May be empty on the last page, never `null`. |
+| `next` | `String` | Opaque cursor for the next page. `null` when this is the last page. |
 
 ---
 
