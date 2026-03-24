@@ -94,6 +94,13 @@ publishing {
 	}
 }
 
+javadoc {
+	// Lombok-generated constructors and private fields cannot carry Javadoc comments.
+	// Disable the 'missing' doclint category so they don't produce warnings; all other
+	// categories (reference, syntax, html, accessibility) remain active.
+	options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
 signing {
 	required { (gradle.taskGraph.hasTask("publish") || gradle.taskGraph.hasTask("zipCentralPortalBundle")) && !project.version.endsWith("SNAPSHOT") }
 	useGpgCmd()

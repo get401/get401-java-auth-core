@@ -13,5 +13,11 @@ import java.lang.annotation.Target;
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface VerifyRoles {
+    /**
+     * One or more role names required to access the annotated element.
+     * The JWT must contain at least one of the specified roles.
+     *
+     * @return the required role names
+     */
     String[] value();
 }

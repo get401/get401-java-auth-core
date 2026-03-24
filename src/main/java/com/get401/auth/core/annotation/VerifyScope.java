@@ -16,5 +16,10 @@ import java.lang.annotation.Target;
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface VerifyScope {
+    /**
+     * One or more scope strings that must all be present in the JWT's {@code scope} claim.
+     *
+     * @return the required scope strings
+     */
     String[] value();
 }

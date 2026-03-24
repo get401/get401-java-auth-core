@@ -15,6 +15,15 @@ import java.util.Base64;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Fetches and caches the Ed25519 public key used to verify JWTs issued by the Get401 service.
+ *
+ * <p>The key is retrieved from the remote {@code /v1/apps/auth/public-key} endpoint on first use
+ * and held in memory until its {@code expires_at} time is reached, at which point the next call
+ * transparently re-fetches a fresh key.
+ *
+ * <p>All public methods on this class are thread-safe.
+ */
 public class JwtPublicKeyProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtPublicKeyProvider.class);
@@ -32,6 +41,13 @@ public class JwtPublicKeyProvider {
     private PublicKey cachedPublicKey;
     private Instant cachedKeyExpiresAt;
 
+    /**
+     * Creates a new provider for the given application.
+     *
+     * @param appId   the application ID sent in the {@code X-App-Id} request header
+     * @param origin  the origin sent in the {@code Origin} request header (e.g. {@code "https://myapp.com"})
+     * @param baseUrl base URL of the Get401 service, or {@code null} to use the default ({@code https://app.get401.com})
+     */
     public JwtPublicKeyProvider(String appId, String origin, String baseUrl) {
         this.appId = appId;
         this.origin = origin;
